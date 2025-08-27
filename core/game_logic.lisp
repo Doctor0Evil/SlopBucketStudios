@@ -1,63 +1,73 @@
 ;;; File: core/game_logic.lisp
 (defpackage :core.game-logic
   (:use :cl :alexandria)
-  (:export :play-dice-game :word-twist-result :register-twist-macro))
+  (:export :play-dice-game
+           :route-dot-command
+           :register-dot-combo
+           :run-word-twist))
 
 (in-package :core.game-logic)
 
-;; --- Dice Utilities ---
-(defun roll-die (&optional (sides 6))
-  "Rolls a die with N sides."
-  (+ 1 (random sides)))
+(defvar *dot-combo-table* (make-hash-table :test 'equal))
+(defvar *event-log* nil)
 
-(defun roll-dice (&optional (n 2) (sides 6))
-  "Rolls N dice with S sides."
-  (loop repeat n collect (roll-die sides)))
+;; --- Dice Roll Core ---
+(defun roll-d6 () (+ 1 (random 6)))
+(defun roll-dice (n) (loop repeat n collect (roll-d6)))
 
-;; --- Dynamic Dot-Command (Twist) Mapping ---
-(defvar *twist-macro-table* (make-hash-table :test 'equal))
+;; --- Dot-Command Routing (Word-Twist System) ---
+(defun register-dot-combo (dot-key effect-func)
+  "Register a new dot macro (scene/event/dialogue-twist)."
+  (setf (gethash dot-key *dot-combo-table*) effect-func))
 
-(defun register-twist-macro (dot-key func)
-  "Register new word-twisting/dot-syntax macro for runtime extension."
-  (setf (gethash dot-key *twist-macro-table*) func))
+(defun route-dot-command (dot-command context)
+  "Main entry: run and log a dot-combo macro, or return fallback."
+  (let ((f (gethash dot-command *dot-combo-table*)))
+    (push (list dot-command context (if f :success :fallback) (get-universal-time)) *event-log*)
+    (if f (funcall f context)
+        (format nil "[Unmapped dot-command: ~A]" dot-command))))
 
-(defun word-twist-result (dot-cmd context)
-  "Given a 'dot' command, return custom logic/scene/dialogue twist."
-  (let ((f (gethash dot-cmd *twist-macro-table*)))
-    (if f
-        (funcall f context)
-        (format nil "[No twist mapped to: ~A]" dot-cmd))))
+;; -- Example: Dice Game Infused with Word-Twist/Scene Mechanics --
+(defun run-word-twist (dice-ctx user-str)
+  "If user gave valid dot-command, run its effect in the dice scene."
+  (cond
+    ((string= user-str "fuck.you")
+     (route-dot-command "fuck.you" dice-ctx))
+    ((string= user-str "snake.eyes")
+     (route-dot-command "snake.eyes" dice-ctx))
+    ((string= user-str "vac.bs")
+     (route-dot-command "vac.bs" dice-ctx))
+    (t "[No word-twist triggered]")))
 
-;; --- Dice Game Core - Infused with Twist System ---
-(defun play-dice-game ()
-  "Runs a replayable dice game session; allows dynamic 'dot' command injection."
+(defun play-dice-game (&optional (user-str ""))
+  "Roll dice, dynamically trigger replayable, eventful dot-macro scenes."
   (let* ((dice (roll-dice 2))
-         (twist (if (> (car dice) (cadr dice)) "over.under" "under.over"))
          (outcome (cond
-                    ((equal dice '(6 6)) "twist.lucky.double-six")
-                    ((equal dice '(1 1)) "twist.snake-eyes")
-                    (t twist))))
-    (format t "~%You rolled: ~A~%Result: ~A~%Twist Effect: ~A~%"
-            dice outcome (word-twist-result outcome dice))))
+                    ((equal dice '(1 1)) 'snake.eyes)
+                    ((equal dice '(6 6)) 'double.six)
+                    ((> (car dice) (cadr dice)) 'over.under)
+                    (t 'under.over))))
+    (format t "~%Dice rolled: ~A | Outcome: ~A~%" dice outcome)
+    (let ((scene-res (run-word-twist dice user-str)))
+      (when (stringp scene-res) (format t "Twist: ~A~%" scene-res)))))
 
-;; --- Register Example Word-Twist Macros ---
-(register-twist-macro "twist.lucky.double-six"
-  (lambda (context)
-    "JACKPOT! Dialogue unlocks 'congratulate.winner' + special scene triggered."))
+;; --- Register Core Word-Twist Combos (Expanding On Demand) ---
+(register-dot-combo "fuck.you"
+  (lambda (ctx)
+    "Animosity escalates: NPC's mood shifts, scene tension spikes, fight chance rises."))
 
-(register-twist-macro "twist.snake-eyes"
-  (lambda (context)
-    "Snake Eyes! Rival insults you ('fuck.you'), bar brawl nearly triggers!"))
+(register-dot-combo "snake.eyes"
+  (lambda (ctx)
+    "Bad luck: Gator-corpse bonus! Random sewer-creature event erupts, mocking banter."))
 
-(register-twist-macro "over.under"
-  (lambda (dice)
-    (if (> (car dice) (cadr dice))
-        "Player dominates, unlocks 'dominance.scene.trigger'"
-        "Result misrouted; logic error.")))
+(register-dot-combo "vac.bs"
+  (lambda (ctx)
+    "Comic relief: Player groans about work-vacation, bystanders cheer, random street insult triggers."))
 
-(register-twist-macro "under.over"
-  (lambda (dice)
-    (if (< (car dice) (cadr dice))
-        "NPC taunts: 'better luck next time!', minor scuffle dialogue spun."
-        "Result misrouted; logic error.")))
-GitHub destination: core/game_logic.lisp
+(register-dot-combo "double.six"
+  (lambda (ctx)
+    "Jackpot! Instant lucky dialogue, rare ally, or scene windfall initiated."))
+
+(register-dot-combo "over.under"
+  (lambda (ctx)
+    "Your luck outpaces the other, triggering new bravado banter and minor stat buff."))

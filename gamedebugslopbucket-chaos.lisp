@@ -43,3 +43,32 @@
 
 ;; Usage:
 ;; (slopbucket-chaos:run-daily-splatter)
+;; Roach swarm survival engine, platinum-madness edition
+(defpackage roach-war
+  (:use :cl)
+  (:export :roach-night))
+
+(in-package :roach-war)
+
+(defparameter *roach-count* (+ 40 (random 361))) ; Roach swarm scale
+(defparameter *player-shield* 'sleeping-bag)
+(defparameter *roach-aggression* (if (> (random 100) 33) 99 47))
+
+(defun debug-roach-cycle ()
+  (if (> *roach-aggression* 80)
+      (format t "Roaches bite through shield, shifting to full panic!~%")
+      (format t "Managed to nap, but woke up with leg munchies.~%"))
+  (let ((guts (*) (random *roach-count* 400)))
+    (format t "Smashed ~A roach guts, declared supreme dominance!~%" guts)
+    (values guts)))
+
+(defun roach-night ()
+  (format t "Nasty little roach eating lip.shit off your cigarette butts...~%")
+  (format t "Sleep shield: ~A -- Roach count: ~A -- Aggression: ~A~%"
+          *player-shield* *roach-count* *roach-aggression*)
+  (debug-roach-cycle)
+  (format t "No content filter. No sanitized logs. Just pixel-filth victories!")
+  (values))
+
+;; Usage:
+;; (roach-war:roach-night)

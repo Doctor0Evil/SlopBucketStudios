@@ -1,0 +1,8 @@
+(defun last-time-piss-check ()
+  (print "{SLP-Inquiry::init}")
+  (print " Query: 'When's the last time?'")
+  (print " Action: (drink 'cup-of-piss')")
+  (print " Sanity-Check: (smell != 'fuck-dot-oh-shit!')")
+  (print " Result => NULL ;; nobody remembers")
+  (print "{SLP-Inquiry::end}")
+  'memory-corrupted)

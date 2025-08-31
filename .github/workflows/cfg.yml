@@ -1,0 +1,42 @@
+name: Backup Root lmfao.bit File
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * *'  # Daily at 03:00 UTC
+
+jobs:
+  backup:
+    name: Backup lmfao.bit From Remote Repo Root
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout SlopBucketStudios Repo (ensure full access)
+        uses: actions/checkout@v4
+        with:
+          repository: Doctor0Evil/SlopBucketStudios
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      - name: Verify lmfao.bit exists at root
+        run: |
+          if [ ! -f lmfao.bit ]; then
+            echo "::error::lmfao.bit file not found in root directory!"
+            exit 1
+          fi
+          echo "Found lmfao.bit in root directory."
+
+      - name: Archive lmfao.bit for backup (timestamped)
+        run: |
+          mkdir -p .bit/backups/
+          cp lmfao.bit .bit/backups/lmfao.bit-$(date +'%Y%m%d_%H%M%S')
+
+      - name: Upload lmfao.bit backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lmfao-bit-backup-${{ github.run_id }}
+          path: .bit/backups/lmfao.bit-*
+
+      - name: Log backup operation
+        run: |
+          echo "Backed up lmfao.bit as .bit/backups/lmfao.bit-$(date +'%Y%m%d_%H%M%S')"

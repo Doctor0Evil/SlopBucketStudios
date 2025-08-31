@@ -1,0 +1,33 @@
+- name: Locate or fetch get_pending_workflows.py
+  id: locate
+  shell: bash
+  run: |
+    echo "🔍 Searching for get_pending_workflows.py..."
+    SCRIPT_PATH=$(find . -type f -iname "get_pending_workflows.py" | head -n 1 || true)
+
+    if [ -z "$SCRIPT_PATH" ]; then
+      echo "::warning::get_pending_workflows.py not found locally — attempting to fetch from canonical Bit.Hub"
+      mkdir -p .bithub/reports
+      git clone --depth=1 https://github.com/Doctor0Evil/Bit.Hub.git /tmp/bithub || {
+        echo "::warning::Canonical repo unreachable — logging missing script"
+        echo "{\"event\":\"missing_script\",\"script\":\"get_pending_workflows.py\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" \
+          > .bithub/reports/missing_get_pending_workflows.json
+        exit 0
+      }
+      cp /tmp/bithub/scripts/get_pending_workflows.py ./ || {
+        echo "::warning::Script not present in canonical repo — logging"
+        echo "{\"event\":\"missing_script\",\"script\":\"get_pending_workflows.py\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" \
+          > .bithub/reports/missing_get_pending_workflows.json
+        exit 0
+      }
+      SCRIPT_PATH="./get_pending_workflows.py"
+      echo "✅ Pulled from canonical Bit.Hub"
+    else
+      echo "✅ Found at: $SCRIPT_PATH"
+    fi
+
+    echo "script_path=$SCRIPT_PATH" >> "$GITHUB_OUTPUT"
+
+- name: Run get_pending_workflows.py
+  if: steps.locate.outputs.script_path != ''
+  run: python "${{ steps.locate.outputs.script_path }}"

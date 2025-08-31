@@ -62,3 +62,46 @@ jobs:
         run: |
           python "${{ steps.find_run.outputs.script_path }}" \
             --input pending_wfs.json
+
+name: WTF Config – Locate get_pending_workflows.py
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  locate-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Search for get_pending_workflows.py
+        id: search
+        shell: bash
+        run: |
+          echo "🔍 Searching for get_pending_workflows.py..."
+          SCRIPT_PATH=$(find . -type f -iname "get_pending_workflows.py" | head -n 1 || true)
+          if [ -n "$SCRIPT_PATH" ]; then
+            echo "✅ Found at: $SCRIPT_PATH"
+            echo "script_path=$SCRIPT_PATH" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::get_pending_workflows.py not found — continuing without it"
+            echo "script_path=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Use script if present
+        if: steps.search.outputs.script_path != ''
+        run: |
+          echo "Running ${{ steps.search.outputs.script_path }}..."
+          python "${{ steps.search.outputs.script_path }}"
+
+      - name: Log missing script
+        if: steps.search.outputs.script_path == ''
+        run: |
+          mkdir -p .bithub/reports
+          echo "{\"event\":\"missing_script\",\"script\":\"get_pending_workflows.py\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" \
+            > .bithub/reports/missing_get_pending_workflows.json
+          echo "Logged missing script event to .bithub/reports/"

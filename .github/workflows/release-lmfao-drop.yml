@@ -1,0 +1,96 @@
+name: Release LMFAO Drop
+
+on:
+  push:
+    paths:
+      - "lmfao.bit"
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: "Mark as pre-release"
+        type: boolean
+        default: false
+      set_latest:
+        description: "Mark as latest release"
+        type: boolean
+        default: true
+      tag_prefix:
+        description: "Optional tag prefix (default: lmfao)"
+        type: string
+        default: "lmfao"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-lmfao-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  create_release:
+    name: Create release from lmfao.bit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify artifact exists
+        id: check
+        shell: bash
+        run: |
+          if [ ! -f "lmfao.bit" ]; then
+            echo "::error file=lmfao.bit::lmfao.bit not found at repo root"
+            exit 1
+          fi
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+
+      - name: Compute tag and title
+        id: meta
+        shell: bash
+        run: |
+          ts="$(date -u +'%Y%m%d-%H%M%S')"
+          sha="${GITHUB_SHA::7}"
+          prefix="${{ inputs.tag_prefix || 'lmfao' }}"
+          tag="${prefix}-${ts}-${sha}"
+          title="LMFAO Drop — ${ts} (${sha})"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "title=$title" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.title }}
+          body: |
+            Automated release for lmfao.bit
+            - Commit: ${{ github.sha }}
+            - Branch: ${{ github.ref_name }}
+            - Actor:  ${{ github.actor }}
+          draft: false
+          prerelease: ${{ inputs.prerelease }}
+          generate_release_notes: true
+          make_latest: ${{ inputs.set_latest && 'true' || 'false' }}
+          files: |
+            lmfao.bit
+
+      - name: Log release event (best-effort)
+        shell: bash
+        run: |
+          set +e
+          mkdir -p .bithub/events
+          cat > ".bithub/events/release-${{ github.run_id }}.json" <<JSON
+          {
+            "event": "release_created",
+            "artifact": "lmfao.bit",
+            "tag": "${{ steps.meta.outputs.tag }}",
+            "title": "${{ steps.meta.outputs.title }}",
+            "by": "${{ github.actor }}",
+            "repo": "${{ github.repository }}",
+            "commit": "${{ github.sha }}",
+            "timestamp": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          }
+          JSON
+          git add .bithub/events || true
+          git -c user.name="bitbot" -c user.email="bitbot@users.noreply.github.com" \
+            commit -m "chore(events): log release ${{ steps.meta.outputs.tag }}" || true
+          set -e
